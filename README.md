@@ -3,6 +3,8 @@ Dockerized script to prepare a hypriot disk image for running under qemu
 - include enlargement of image and adjustment of filesystem
 - using only raw ubuntu tools to keep the container minimal
 
+** Note : WIP, not exactly working right now :) **
+
 Parameters are 
 
 1. IMG - path in docker (so you may need to mount image folder somewhere within docker container)
