@@ -52,7 +52,6 @@ function expand_filesystem(){
 function loop_sda2_from_img(){
 	PART2_OFFSET=$(fdisk -l $IMAGE | grep img2 | awk '{ print $2}')
 	PART2_OFFSET=$(( $PART2_OFFSET * 512 ))
-	echo here is begin of partition 2 $PART2_OFFSET
 	losetup -o $PART2_OFFSET /dev/loop0 $IMAGE
 }
 
