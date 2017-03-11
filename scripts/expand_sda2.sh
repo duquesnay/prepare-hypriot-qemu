@@ -42,9 +42,14 @@ EOF
 
 }
 
+function check_filesystem(){
+	loop_sda2_from_img
+	e2fsck -fp /dev/loop0
+	unloop_sda2_from_img
+}
+
 function expand_filesystem(){
 	loop_sda2_from_img
-	e2fsck -f /dev/loop0
 	resize2fs /dev/loop0
 	unloop_sda2_from_img
 }
@@ -67,11 +72,13 @@ function prepare_for_hypriot(){
 
 	# Remove original preload file
 	if [ -f $MOUNT/etc/ld.so.preload ]; then
-		cp $MOUNT/etc/ld.so.preload $MOUNT/etc/ld.so.preload.old
+		cp $MOUNT/etc/ld.so.{,.old}
 		sed -i -e 's/^/#/' $MOUNT/etc/ld.so.preload
-		sed -i -e 's/^snd_bcm/#snd_bcmx/' $MOUNT/etc/modules-load.d/modules.conf
 	fi
 
+	cp $MOUNT/etc/modules-load.d/modules.conf{,.old}
+	sed -i -e 's/^snd_bcm/#snd_bcmx/' $MOUNT/etc/modules-load.d/modules.conf
+	
 	mkdir -p $MOUNT/etc/udev/rules.d/
 	touch $MOUNT/etc/udev/rules.d/90-qemu.rules
 	echo 'KERNEL=="sda", SYMLINK+="mmcblk0"' >> $MOUNT/etc/udev/rules.d/90-qemu.rules
@@ -85,6 +92,12 @@ function prepare_for_hypriot(){
 cd $(dirname $0)
 echo resize_img
 resize_img $IMAGE $SIZE
+echo ">>> Image extended to $(numfmt --to=iec $SIZE)"
 expand_partition2 $IMAGE
+echo ">>> Partition table updated to new size"
+check_filesystem
+echo ">>> Filesystem checked"
 expand_filesystem
+echo ">>> Filesystem updated to new partition size"
 prepare_for_hypriot	
+echo ">>> Hypriot conf adapted to qemu subtelties"
