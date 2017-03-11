@@ -11,7 +11,7 @@ Parameters are
 2. size - in human readable form (1M, 8G, etc)
 
 ```bash
-docker run --privileged=true -v $(pwd)/../images:/usr/rpi/images duquesnay/prepare-hypriot-emu images/hypriotos-rpi-v1.1.3.img 8G
+docker run --privileged=true -v $(pwd)/images:/usr/rpi/images duquesnay/prepare-hypriot-emu images/hypriotos-rpi-v1.1.3.img 8G
 ```
 Then run it with qemu such as (macos version, require downloading proper kernel externally, network access unrestriced; tune to your own needs)
 ```bash
