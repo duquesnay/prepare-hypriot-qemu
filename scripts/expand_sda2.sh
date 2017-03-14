@@ -2,6 +2,7 @@
 if [ "$#" -ne 2 ]; then 
     echo "Usage: $0 IMAGE SIZE"
     echo "IMAGE - raspberry pi .img file"
+    echo "SIZE - size in bash human readable format (see 'iec' numeric format)"
     exit
 fi
 if [ ! -f $1 ]; then
@@ -11,14 +12,14 @@ fi
 
 IMAGE=$1
 SIZE=$(numfmt --from=iec $2)
-echo SIZE=$SIZE
 
 function resize_img(){
 	#[[ $(stat -f %z $1) -gt $SIZE ]] && exit 1
 	#qemu-img resize $1 $2
 	CUR_SIZE=$(stat -c%s $1)
-	if [ $CUR_SIZE -gt $2 ]; then 
-		echo "image already bigger $CUR_SIZE, won\'t do it" 
+	echo resizing $1 to $2
+	if [ $CUR_SIZE -ge $2 ]; then 
+		echo "original size ${CUR_SIZE}, already >= $2, no need expand" 
 		exit 1 
 	fi
 
@@ -92,12 +93,14 @@ function prepare_for_hypriot(){
 cd $(dirname $0)
 echo resize_img
 resize_img $IMAGE $SIZE
-echo ">>> Image extended to $(numfmt --to=iec $SIZE)"
-expand_partition2 $IMAGE
-echo ">>> Partition table updated to new size"
-check_filesystem
-echo ">>> Filesystem checked"
-expand_filesystem
-echo ">>> Filesystem updated to new partition size"
+if [[ $? -eq "0" ]]; then
+	echo ">>> Image extended to $(numfmt --to=iec $SIZE)"
+	expand_partition2 $IMAGE
+	echo ">>> Partition table updated to new size"
+	check_filesystem
+	echo ">>> Filesystem checked"
+	expand_filesystem
+	echo ">>> Filesystem updated to new partition size"
+fi
 prepare_for_hypriot	
 echo ">>> Hypriot conf adapted to qemu subtelties"
