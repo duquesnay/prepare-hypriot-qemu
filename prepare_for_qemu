@@ -1,5 +1,9 @@
 #!/bin/bash
 
+errcho() {
+	>&2 echo $*
+}
+
 usage()
 {
   cat << EOF
@@ -25,9 +29,9 @@ while getopts "hs:i:n:t:" opt; do
 	n)	hostname="$OPTARG" ;;
 	t)	TARGET_DIR="$OPTARG" ;;
 	h) 	usage ;;
-    \? ) echo "Unknown option: -$OPTARG" >&2; exit 1;;
-    :  ) echo "Missing option argument for -$OPTARG" >&2; exit 1;;
-    *  ) echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
+    \? ) errcho "Unknown option: -$OPTARG" >&2; exit 1;;
+    :  ) errcho "Missing option argument for -$OPTARG" >&2; exit 1;;
+    *  ) errcho "Unimplemented option: -$OPTARG" >&2; exit 1;;
     esac
 done
 
@@ -35,19 +39,19 @@ done
 
 if [ "$image" == "" ] #&& [[ -d $1 ]]
 then
-    echo "-i must be used to set which image to run" >&2
+    errcho "-i must be used to set which image to run" >&2
     usage
 fi
 
 if [[ "$size" == "" ]]
 then
-    echo "-s must be used to define kernel to run image" >&2
+    errcho "-s must be used to define kernel to run image" >&2
     usage
 fi
 
 if [[ "$hostname" == "" ]]
 then
-    echo "-n must be used to define hostname" >&2
+    errcho "-n must be used to define hostname" >&2
     usage
 fi
 
@@ -57,7 +61,7 @@ then
 fi
 
 if [ ! -f ${image} ]; then
-	echo "Image file \"$image\" does not exist"
+	errcho "Image file \"$image\" does not exist"
 	usage
 fi
 
@@ -77,9 +81,9 @@ function generate_copy(){
 function resize_img(){
 	CUR_SIZE=$(stat -c%s $1)
 	size=$(numfmt --from=iec $2)
-	echo resizing $1 to $size
+	errcho resizing $1 to $size
 	if [ $CUR_SIZE -ge $size ]; then 
-		echo "original size ${CUR_SIZE}, already >= $2, no need expand"
+		errcho "original size ${CUR_SIZE}, already >= $2, no need expand"
 		false
 	else
 		truncate --size=$2 $1
@@ -161,9 +165,9 @@ function prepare_for_qemu(){
 	
 	mkdir -p $MOUNT/etc/udev/rules.d/
 	touch $MOUNT/etc/udev/rules.d/90-qemu.rules
-	echo 'KERNEL=="sda", SYMLINK+="mmcblk0"' >> $MOUNT/etc/udev/rules.d/90-qemu.rules
-	echo 'KERNEL=="sda?", SYMLINK+="mmcblk0p%n"' >> $MOUNT/etc/udev/rules.d/90-qemu.rules
-	echo 'KERNEL=="sda2", SYMLINK+="root"' >> $MOUNT/etc/udev/rules.d/90-qemu.rules
+	errcho 'KERNEL=="sda", SYMLINK+="mmcblk0"' >> $MOUNT/etc/udev/rules.d/90-qemu.rules
+	errcho 'KERNEL=="sda?", SYMLINK+="mmcblk0p%n"' >> $MOUNT/etc/udev/rules.d/90-qemu.rules
+	errcho 'KERNEL=="sda2", SYMLINK+="root"' >> $MOUNT/etc/udev/rules.d/90-qemu.rules
 
 	umount $MOUNT
 	unloop_sda2_from_img
@@ -177,45 +181,45 @@ function customize_boot_config(){
 	dev=/dev/loop1
 	boot=/tmp/mnt_boot
 	mkdir $boot
-	# FS_TYPE=$(sudo blkid -o value -s TYPE "${dev}" || echo vfat)
+	# FS_TYPE=$(sudo blkid -o value -s TYPE "${dev}" || errcho vfat)
 	# mount -t ${FS_TYPE} "${dev}" "${boot}"
 	mount "${dev}" "${boot}"
 
 	if [ -f "${boot}/device-init.yaml" ]; then
-	  echo "Setting device-init"
+	  errcho "Setting device-init"
 	  if [ ! -z "${SD_HOSTNAME}" ]; then
-	    echo "  Set hostname=${SD_HOSTNAME}"
+	    errcho "  Set hostname=${SD_HOSTNAME}"
 	    sed -i -e "s/.*hostname:.*\$/hostname: ${SD_HOSTNAME}/" "${boot}/device-init.yaml"
 	  fi
 	  if [ ! -z "${WIFI_SSID}" ]; then
-	    echo "  Set wlan0/ssid=${WIFI_SSID}"
+	    errcho "  Set wlan0/ssid=${WIFI_SSID}"
 	    sudo sed -i -e "s/.*wlan0:.*\$/    wlan0:/" "${boot}/device-init.yaml"
 	    sudo sed -i -e "s/.*ssid:.*\$/      ssid: \"${WIFI_SSID}\"/" "${boot}/device-init.yaml"
 	  fi
 	  if [ ! -z "${WIFI_PASSWORD}" ]; then
-	    echo "  Set wlan0/password=${WIFI_PASSWORD}"
+	    errcho "  Set wlan0/password=${WIFI_PASSWORD}"
 	    sudo sed -i -e "s/.*wlan0:.*\$/    wlan0:/" "${boot}/device-init.yaml"
 	    sudo sed -i -e "s/.*password:.*\$/      password: \"${WIFI_PASSWORD}\"/" "${boot}/device-init.yaml"
 	  fi
 	  if [ ! -z "${CLUSTERLAB}" ]; then
-	    echo "  Set Cluster-Lab/run_on_boot=${CLUSTERLAB}"
+	    errcho "  Set Cluster-Lab/run_on_boot=${CLUSTERLAB}"
 	    sudo sed -i -e "s/.*run_on_boot.*\$/    run_on_boot: \"${CLUSTERLAB}\"/" "${boot}/device-init.yaml"
 	  fi
 	fi
 
 	# legacy: /boot/occidentalis.txt of old Hector release
 	if [ -f "${boot}/occidentalis.txt" ]; then
-	  echo "Setting Occidentalis"
+	  errcho "Setting Occidentalis"
 	  if [ ! -z "${SD_HOSTNAME}" ]; then
-	    echo "  Set hostname=${SD_HOSTNAME}"
+	    errcho "  Set hostname=${SD_HOSTNAME}"
 	    sudo sed -i -e "s/.*hostname.*=.*\$/hostname=${SD_HOSTNAME}/" "${boot}/occidentalis.txt"
 	  fi
 	  if [ ! -z "${WIFI_SSID}" ]; then
-	    echo "  Set wifi_ssid=${WIFI_SSID}"
+	    errcho "  Set wifi_ssid=${WIFI_SSID}"
 	    sudo sed -i -e "s/.*wifi_ssid.*=.*\$/wifi_ssid=${WIFI_SSID}/" "${boot}/occidentalis.txt"
 	  fi
 	  if [ ! -z "${WIFI_PASSWORD}" ]; then
-	    echo "  Set wifi_password=${WIFI_PASSWORD}"
+	    errcho "  Set wifi_password=${WIFI_PASSWORD}"
 	    sudo sed -i -e "s/.*wifi_password.*=.*\$/wifi_password=${WIFI_PASSWORD}/" "${boot}/occidentalis.txt"
 	  fi
 	fi
@@ -223,22 +227,23 @@ function customize_boot_config(){
 }
 
 new_image=$(generate_copy "${image}" "${hostname}")
-echo ">>> renamed copy generated"
+errcho ">>> renamed copy generated" >>2
 customize_boot_config "${new_image}" "${hostname}"
-echo ">>> boot config updated with container name"
+errcho ">>> boot config updated with container name"
 prepare_for_qemu $new_image
-echo ">>> system conf adapted to qemu subtelties"
-echo resize_img to $size in $new_image
+errcho ">>> system conf adapted to qemu subtelties"
+errcho resize_img to $size in $new_image
 resize_img $new_image $size
 if [[ $? -eq 0 ]]; then
-	echo ">>> Image extended to $size"
+	errcho ">>> Image extended to $size"
 	expand_partition2 $new_image
-	echo ">>> Partition table updated to new size"
+	errcho ">>> Partition table updated to new size"
 	check_partition2_filesystem $new_image
-	echo ">>> Filesystem checked"
+	errcho ">>> Filesystem checked"
 	expand_partition2_filesystem $new_image
-	echo ">>> Filesystem updated to new partition size"
+	errcho ">>> Filesystem updated to new partition size"
 else
-	echo "(no change to filesystem required)"
+	errcho "(no change to filesystem required)"
 fi
-echo ">>> Resulting image is ${new_image}"
+errcho ">>> Resulting image is ${new_image}"
+echo ${new_image}
