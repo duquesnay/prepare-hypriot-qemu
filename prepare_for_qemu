@@ -151,7 +151,7 @@ function prepare_for_qemu(){
 	loop_sda2_from_img $1
 	
 	MOUNT=/tmp/mnt_sda2
-	mkdir $MOUNT
+	mkdir -p $MOUNT
 	mount /dev/loop0 $MOUNT
 	
 	# Remove original preload file
@@ -180,7 +180,7 @@ function customize_boot_config(){
 	loop_boot_from_img "${img}"
 	dev=/dev/loop1
 	boot=/tmp/mnt_boot
-	mkdir $boot
+	mkdir -p $boot
 	# FS_TYPE=$(sudo blkid -o value -s TYPE "${dev}" || errcho vfat)
 	# mount -t ${FS_TYPE} "${dev}" "${boot}"
 	mount "${dev}" "${boot}"
