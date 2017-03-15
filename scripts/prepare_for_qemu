@@ -58,8 +58,6 @@ fi
 # size=$(numfmt --from=iec ${size})
 
 function resize_img(){
-	#[[ $(stat -f %z $1) -gt $SIZE ]] && exit 1
-	#qemu-img resize $1 $2
 	CUR_SIZE=$(stat -c%s $1)
 	size=$(numfmt --from=iec $2)
 	echo resizing $1 to $size
@@ -89,12 +87,14 @@ EOF
 }
 
 function check_partition2_filesystem(){
+	unloop_sda2_from_img > /dev/null 2>&1
 	loop_sda2_from_img $1
 	e2fsck -fp /dev/loop0
 	unloop_sda2_from_img
 }
 
 function expand_partition2_filesystem(){
+	unloop_sda2_from_img > /dev/null 2>&1
 	loop_sda2_from_img $1
 	resize2fs /dev/loop0
 	unloop_sda2_from_img
@@ -109,6 +109,7 @@ function loop_sda2_from_img(){
 }
 
 function loop_boot_from_img(){
+	unloop_boot_from_img > /dev/null 2>&1
 	IMAGE=$1
 	extension="${IMAGE##*.}"
 	PART1_OFFSET=$(fdisk -l $IMAGE | grep ${extension}1 | awk '{ print $2}')
@@ -125,6 +126,7 @@ function unloop_boot_from_img(){
 }
 
 function prepare_for_qemu(){
+	unloop_sda2_from_img > /dev/null 2>&1
 	loop_sda2_from_img $1
 	
 	MOUNT=/tmp/mnt_sda2
@@ -211,7 +213,7 @@ function customize_boot_config(){
 	    sudo sed -i -e "s/.*wifi_password.*=.*\$/wifi_password=${WIFI_PASSWORD}/" "${boot}/occidentalis.txt"
 	  fi
 	fi
-	unmount $boot
+	umount $boot
 }
 
 cd $(dirname $0)
