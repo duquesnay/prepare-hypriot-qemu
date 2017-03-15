@@ -3,26 +3,27 @@
 usage()
 {
   cat << EOF
- Usage: $0 -s SIZE -i IMAGE
-    IMAGE - raspberry pi .img file
-    SIZE - size in bash human readable format (see 'iec' numeric format)
- 
-Customize a Hypriot image to run under qemu
+ Usage: $0 -s SIZE -i IMAGE -n HOSTNAME [-t TARGET_DIR]
+  -n HOSTNAME   set hostname for this SD image
+  -i IMAGE      original image to use for cloning and preparation
+  -s SIZE       final size of image
+
+Customize and expand a Hypriot image to run under qemu
 
 OPTIONS:
+  -t TARGET_DIR directory to store generated image
   -h            show this message
-  -n hostname   set hostname for this SD image
-  -i image      original image to use for cloning and preparation
-  -s size       final size of image
+  
 EOF
   exit 1
 }
 
-while getopts "s:i:n:h" opt; do
+while getopts "hs:i:n:t:" opt; do
   case $opt in
     i)  image="$OPTARG" ;;
     s)  size="$OPTARG" ;;
 	n)	hostname="$OPTARG" ;;
+	t)	TARGET_DIR="$OPTARG" ;;
 	h) 	usage ;;
     \? ) echo "Unknown option: -$OPTARG" >&2; exit 1;;
     :  ) echo "Missing option argument for -$OPTARG" >&2; exit 1;;
@@ -50,10 +51,26 @@ then
     usage
 fi
 
+if [[ "$TARGET_DIR" == "" ]]
+then
+    TARGET_DIR=$(realpath $(dirname ${image}))
+fi
+
 if [ ! -f ${image} ]; then
 	echo "Image file \"$image\" does not exist"
 	usage
 fi
+
+function generate_copy(){
+	image=$1
+	container_name=$2
+	filename=$(basename "$1")
+	extension="${filename##*.}"
+	filename="${filename%.*}"
+	container_img=${TARGET_DIR}/${filename}-${container_name}.${extension}
+	cp $image $container_img
+	echo $container_img
+}
 
 # size=$(numfmt --from=iec ${size})
 
@@ -62,11 +79,11 @@ function resize_img(){
 	size=$(numfmt --from=iec $2)
 	echo resizing $1 to $size
 	if [ $CUR_SIZE -ge $size ]; then 
-		echo "original size ${CUR_SIZE}, already >= $2, no need expand" 
-		exit 1 
+		echo "original size ${CUR_SIZE}, already >= $2, no need expand"
+		false
+	else
+		truncate --size=$2 $1
 	fi
-
-	truncate --size=$2 $1
 }
 
 function expand_partition2(){
@@ -152,17 +169,6 @@ function prepare_for_qemu(){
 	unloop_sda2_from_img
 }
 
-function generate_copy(){
-	image=$1
-	container_name=$2
-	filename=$(basename "$1")
-	extension="${filename##*.}"
-	filename="${filename%.*}"
-	container_img=/tmp/images/${filename}-${container_name}.${extension}
-	cp $image $container_img
-	echo $container_img
-}
-
 function customize_boot_config(){
 	img=$1
 	hostname=$2
@@ -216,14 +222,15 @@ function customize_boot_config(){
 	umount $boot
 }
 
-cd $(dirname $0)
 new_image=$(generate_copy "${image}" "${hostname}")
 echo ">>> renamed copy generated"
 customize_boot_config "${new_image}" "${hostname}"
 echo ">>> boot config updated with container name"
+prepare_for_qemu $new_image
+echo ">>> system conf adapted to qemu subtelties"
 echo resize_img to $size in $new_image
 resize_img $new_image $size
-if [[ $? -eq "0" ]]; then
+if [[ $? -eq 0 ]]; then
 	echo ">>> Image extended to $size"
 	expand_partition2 $new_image
 	echo ">>> Partition table updated to new size"
@@ -231,7 +238,7 @@ if [[ $? -eq "0" ]]; then
 	echo ">>> Filesystem checked"
 	expand_partition2_filesystem $new_image
 	echo ">>> Filesystem updated to new partition size"
+else
+	echo "(no change to filesystem required)"
 fi
-prepare_for_qemu $new_image
-echo ">>> Hypriot conf adapted to qemu subtelties"
 echo ">>> Resulting image is ${new_image}"
