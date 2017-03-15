@@ -81,7 +81,7 @@ function generate_name(){
 function generate_copy(){
 	image=$1
 	container_img=$2
-	cp $image $container_img
+	pv $image > $container_img	
 }
 
 # size=$(numfmt --from=iec ${size})
@@ -235,7 +235,7 @@ function customize_boot_config(){
 }
 
 new_image=$(generate_name "${image}" "${hostname}")
-errcho ">>> destinaton set to ${new_image}"
+errcho ">>> result is ${new_image}"
 
 if [ -f ${new_image} ] ; then
     if [ "$OVERWRITE" = false ] ; then
