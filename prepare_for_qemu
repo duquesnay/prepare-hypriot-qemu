@@ -17,17 +17,21 @@ Customize and expand a Hypriot image to run under qemu
 OPTIONS:
   -t TARGET_DIR directory to store generated image
   -h            show this message
+  -x            override existing image if exists
   
 EOF
   exit 1
 }
 
-while getopts "hs:i:n:t:" opt; do
+OVERWRITE=false
+
+while getopts "hs:i:n:t:x" opt; do
   case $opt in
     i)  image="$OPTARG" ;;
     s)  size="$OPTARG" ;;
 	n)	hostname="$OPTARG" ;;
 	t)	TARGET_DIR="$OPTARG" ;;
+	x)  OVERWRITE=true ;;
 	h) 	usage ;;
     \? ) errcho "Unknown option: -$OPTARG" >&2; exit 1;;
     :  ) errcho "Missing option argument for -$OPTARG" >&2; exit 1;;
@@ -39,19 +43,19 @@ done
 
 if [ "$image" == "" ] #&& [[ -d $1 ]]
 then
-    errcho "-i must be used to set which image to run" >&2
+    errcho "source image must be defined (use -i ...)" >&2
     usage
 fi
 
 if [[ "$size" == "" ]]
 then
-    errcho "-s must be used to define kernel to run image" >&2
+    errcho "size  must be defined (use -s ...)" >&2
     usage
 fi
 
 if [[ "$hostname" == "" ]]
 then
-    errcho "-n must be used to define hostname" >&2
+    errcho "hostname must be defined (use -n ...)" >&2
     usage
 fi
 
@@ -61,19 +65,23 @@ then
 fi
 
 if [ ! -f ${image} ]; then
-	errcho "Image file \"$image\" does not exist"
+	errcho "Source image file \"$image\" does not exist"
 	usage
 fi
 
-function generate_copy(){
+function generate_name(){
 	image=$1
 	container_name=$2
 	filename=$(basename "$1")
 	extension="${filename##*.}"
 	filename="${filename%.*}"
-	container_img=${TARGET_DIR}/${filename}-${container_name}.${extension}
+	echo ${TARGET_DIR}/${filename}-${container_name}.${extension}
+}
+
+function generate_copy(){
+	image=$1
+	container_img=$2
 	cp $image $container_img
-	echo $container_img
 }
 
 # size=$(numfmt --from=iec ${size})
@@ -226,14 +234,30 @@ function customize_boot_config(){
 	umount $boot
 }
 
-new_image=$(generate_copy "${image}" "${hostname}")
-errcho ">>> renamed copy generated" >>2
+new_image=$(generate_name "${image}" "${hostname}")
+errcho ">>> destinaton set to ${new_image}"
+
+if [ -f ${new_image} ] ; then
+    if [ "$OVERWRITE" = false ] ; then
+		errcho "destinaton exist, using it as is"
+	else 
+		generate_copy "${image}" "${new_image}"
+		errcho ">>> target copy ${new_image} generated (forced)"
+	fi
+else
+	generate_copy "${image}" "${new_image}"
+	errcho ">>> target ${new_image} generated"
+fi
+
 customize_boot_config "${new_image}" "${hostname}"
 errcho ">>> boot config updated with container name"
+
 prepare_for_qemu $new_image
 errcho ">>> system conf adapted to qemu subtelties"
+
 errcho resize_img to $size in $new_image
 resize_img $new_image $size
+
 if [[ $? -eq 0 ]]; then
 	errcho ">>> Image extended to $size"
 	expand_partition2 $new_image
