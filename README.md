@@ -14,7 +14,7 @@ Parameters are
 3. -s hostname
 
 ```bash
-docker run --privileged=true -v $(pwd)/images:/usr/rpi/images duquesnay/prepare-hypriot-emu images/hypriotos-rpi-v1.1.3.img 8G
+docker run --privileged=true -v $(pwd)/images:/usr/rpi/images duquesnay/prepare-hypriot-emu -i images/hypriotos-rpi-v1.1.3.img -s 8G -h hostname
 ```
 Then run it with qemu, something like
 ```bash
