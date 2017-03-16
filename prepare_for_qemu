@@ -78,10 +78,12 @@ function generate_name(){
 	echo ${TARGET_DIR}/${filename}-${container_name}.${extension}
 }
 
-function generate_copy(){
-	image=$1
-	container_img=$2
-	pv $image > $container_img	
+function copy_with_progress(){ 
+	# rsync -ah --progress $1 > $2 
+	# curl -o $2 FILE://$1
+	# using pv or cp if not available
+	# pv -p $1 > $2 2>&1 || { errecho  >&2 "using cp instead of unavailable pv" ; }
+	cp $1 $2 
 }
 
 # size=$(numfmt --from=iec ${size})
@@ -193,6 +195,11 @@ function customize_boot_config(){
 	# mount -t ${FS_TYPE} "${dev}" "${boot}"
 	mount "${dev}" "${boot}"
 
+	if [ ! $? ]; then
+		errcho somthing went wrong, aborting
+		exit 2
+	fi
+
 	if [ -f "${boot}/device-init.yaml" ]; then
 	  errcho "Setting device-init"
 	  if [ ! -z "${SD_HOSTNAME}" ]; then
@@ -241,11 +248,12 @@ if [ -f ${new_image} ] ; then
     if [ "$OVERWRITE" = false ] ; then
 		errcho "destinaton exist, using it as is"
 	else 
-		generate_copy "${image}" "${new_image}"
-		errcho ">>> target copy ${new_image} generated (forced)"
+		errcho "copying source image to destination"
+		copy_with_progress "${image}" "${new_image}"
+		errcho ">>> target copy ${new_image} generated (forced by -x option)"
 	fi
 else
-	generate_copy "${image}" "${new_image}"
+	copy_with_progress "${image}" "${new_image}"
 	errcho ">>> target ${new_image} generated"
 fi
 
