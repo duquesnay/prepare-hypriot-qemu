@@ -242,7 +242,7 @@ function customize_boot_config(){
 }
 
 new_image=$(generate_name "${image}" "${hostname}")
-errcho ">>> result is ${new_image}"
+errcho ">>> target will be ${new_image}"
 
 if [ -f ${new_image} ] ; then
     if [ "$OVERWRITE" = false ] ; then
