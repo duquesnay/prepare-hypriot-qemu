@@ -79,10 +79,7 @@ function generate_name(){
 }
 
 function copy_with_progress(){ 
-	# rsync -ah --progress $1 > $2 
-	# curl -o $2 FILE://$1
-	# using pv or cp if not available
-	# pv -p $1 > $2 2>&1 || { errecho  >&2 "using cp instead of unavailable pv" ; }
+	#kknowningly not using fancy progress bar from rsync or pv to rely on barebone utils from ubuntu docker container
 	cp $1 $2 
 }
 
@@ -118,17 +115,15 @@ EOF
 }
 
 function check_partition2_filesystem(){
-	unloop_sda2_from_img > /dev/null 2>&1
-	loop_sda2_from_img $1
-	e2fsck -fp /dev/loop0
-	unloop_sda2_from_img
+	dev=$(loop_sda2_from_img $1)
+	e2fsck -fp $dev
+	unloop_sda2_from_img $dev
 }
 
 function expand_partition2_filesystem(){
-	unloop_sda2_from_img > /dev/null 2>&1
-	loop_sda2_from_img $1
-	resize2fs /dev/loop0
-	unloop_sda2_from_img
+	dev=$(loop_sda2_from_img $1)
+	resize2fs $dev
+	unloop_sda2_from_img $dev
 }
 
 function loop_sda2_from_img(){
@@ -136,33 +131,32 @@ function loop_sda2_from_img(){
 	extension="${IMAGE##*.}"
 	PART2_OFFSET=$(fdisk -l $IMAGE | grep ${extension}2 | awk '{ print $2}')
 	PART2_OFFSET=$(( $PART2_OFFSET * 512 ))
-	losetup -o $PART2_OFFSET /dev/loop0 $IMAGE
+	echo $(losetup --find  --show -o $PART2_OFFSET $IMAGE)
+}
+
+function unloop_sda2_from_img(){
+	losetup -d $1
 }
 
 function loop_boot_from_img(){
-	unloop_boot_from_img > /dev/null 2>&1
 	IMAGE=$1
 	extension="${IMAGE##*.}"
 	PART1_OFFSET=$(fdisk -l $IMAGE | grep ${extension}1 | awk '{ print $2}')
 	PART1_OFFSET=$(( $PART1_OFFSET * 512 ))
-	losetup -o $PART1_OFFSET /dev/loop1 $IMAGE
-}
-
-function unloop_sda2_from_img(){
-	losetup -d /dev/loop0
+	echo $(losetup --find  --show -o $PART1_OFFSET $IMAGE)
 }
 
 function unloop_boot_from_img(){
-	losetup -d /dev/loop1
+	losetup -d $1
 }
 
 function prepare_for_qemu(){
-	unloop_sda2_from_img > /dev/null 2>&1
-	loop_sda2_from_img $1
+	# unloop_sda2_from_img /dev/loop0 > /dev/null 2>&1
+	dev=$(loop_sda2_from_img $1)
 	
-	sda2=/tmp/mnt_sda2
-	dev=/dev/loop1
-	mkdir -p $sda2
+	sda2=/tmp/mnt_sda2.$$
+	# dev=/dev/loop1
+	mkdir -p ${sda2}
 	mount ${dev} ${sda2}
 	
 	# Remove original preload file
@@ -176,21 +170,21 @@ function prepare_for_qemu(){
 	
 	mkdir -p $sda2/etc/udev/rules.d/
 	touch $sda2/etc/udev/rules.d/90-qemu.rules
-	errcho 'KERNEL=="sda", SYMLINK+="mmcblk0"' >> $sda2/etc/udev/rules.d/90-qemu.rules
-	errcho 'KERNEL=="sda?", SYMLINK+="mmcblk0p%n"' >> $sda2/etc/udev/rules.d/90-qemu.rules
-	errcho 'KERNEL=="sda2", SYMLINK+="root"' >> $sda2/etc/udev/rules.d/90-qemu.rules
+	echo 'KERNEL=="sda", SYMLINK+="mmcblk0"' >> $sda2/etc/udev/rules.d/90-qemu.rules
+	echo 'KERNEL=="sda?", SYMLINK+="mmcblk0p%n"' >> $sda2/etc/udev/rules.d/90-qemu.rules
+	echo 'KERNEL=="sda2", SYMLINK+="root"' >> $sda2/etc/udev/rules.d/90-qemu.rules
 
 	umount $sda2
-	unloop_sda2_from_img
+	unloop_sda2_from_img $dev
 }
 
 function customize_boot_config(){
 	img=$1
 	hostname=$2
 	SD_HOSTNAME=$hostname
-	loop_boot_from_img "${img}"
-	dev=/dev/loop1
-	boot=/tmp/mnt_boot
+	dev=$(loop_boot_from_img "${img}")
+	
+	boot=/tmp/mnt_boot.$$
 	mkdir -p $boot
 	# FS_TYPE=$(sudo blkid -o value -s TYPE "${dev}" || errcho vfat)
 	# mount -t ${FS_TYPE} "${dev}" "${boot}"
@@ -240,6 +234,7 @@ function customize_boot_config(){
 	  fi
 	fi
 	umount $boot
+	unloop_boot_from_img $dev
 }
 
 new_image=$(generate_name "${image}" "${hostname}")
